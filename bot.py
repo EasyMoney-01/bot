@@ -6,7 +6,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import logging
 import os
 from dotenv import load_dotenv
-import html
 from datetime import datetime
 
 # Load environment variables
@@ -22,6 +21,10 @@ logger = logging.getLogger(__name__)
 # Bot token from environment variable
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
+if not BOT_TOKEN:
+    logger.error("❌ BOT_TOKEN environment variable not set!")
+    raise ValueError("BOT_TOKEN environment variable not set!")
+
 # Code By : @sarthx_bot
 def get_vehicle_info(num):
     """
@@ -33,7 +36,8 @@ def get_vehicle_info(num):
             "User-Agent": ua,
         }
         c = f"https://vahanx.in/rc-search/{num}"
-        r = requests.get(c, headers=h)
+        r = requests.get(c, headers=h, timeout=10)
+        r.raise_for_status()
         soup = BeautifulSoup(r.text, 'html.parser')
         
         # Code By : @sarthx_bots
@@ -91,14 +95,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a modern welcome message when the command /start is issued."""
     user = update.effective_user
     
-    # Modern welcome message with dark shadow theme
     welcome_message = f"""
 ╔═══════════════════════╗
-    🚗 *DARK SHADOW VEHICLE BOT* 🚗
+    🚗 DARK SHADOW VEHICLE BOT 🚗
 ╚═══════════════════════╝
 
 ┌─────────────────────────┐
-   👋 *Welcome {user.first_name}!*
+   👋 Welcome {user.first_name}!
 └─────────────────────────┘
 
 *OWNER: DARK SHADOW*
@@ -116,21 +119,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 ✨ *Simply send me a vehicle number to begin the search!*
     """
     
-    await update.message.reply_text(
-        welcome_message, 
-        parse_mode='Markdown',
-        reply_markup=create_main_menu()
-    )
+    if update.message:
+        await update.message.reply_text(
+            welcome_message, 
+            parse_mode='Markdown',
+            reply_markup=create_main_menu()
+        )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send modern help message."""
     help_text = """
 ╔═══════════════════════╗
-       📖 *DARK SHADOW GUIDE*
+       📖 DARK SHADOW GUIDE
 ╚═══════════════════════╝
 
 ┌─────────────────────────┐
-        🚀 *QUICK START*
+        🚀 QUICK START
 └─────────────────────────┘
 
 📝 *Send Vehicle Number Like:*
@@ -139,7 +143,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 • `MH12EF9012`
 
 ┌─────────────────────────┐
-        🛠️ *COMMANDS*
+        🛠️ COMMANDS
 └─────────────────────────┘
 
 /start - Wake the Shadow Bot
@@ -147,10 +151,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 /about - Know the creator
 
 ┌─────────────────────────┐
-        🔍 *SEARCH TIPS*
+        🔍 SEARCH TIPS
 └─────────────────────────┘
 
-• Use correct format: **ST** + **NN** + **AA** + **NNNN**
+• Use correct format: ST + NN + AA + NNNN
 • No spaces between characters
 • Case insensitive
 
@@ -181,11 +185,11 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send modern about message."""
     about_text = """
 ╔═══════════════════════╗
-        👤 *SHADOW PROFILE*
+        👤 SHADOW PROFILE
 ╚═══════════════════════╝
 
 ┌─────────────────────────┐
-        🎭 *IDENTITY*
+        🎭 IDENTITY
 └─────────────────────────┘
 
 *NAME:* DARK SHADOW
@@ -194,7 +198,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 *POWER:* Vehicle Intelligence
 
 ┌─────────────────────────┐
-        🌟 *FEATURES*
+        🌟 FEATURES
 └─────────────────────────┘
 
 • 🕵️ Stealth Data Extraction
@@ -204,7 +208,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 • 💡 Advanced Algorithms
 
 ┌─────────────────────────┐
-        ⚡ *TECHNOLOGY*
+        ⚡ TECHNOLOGY
 └─────────────────────────┘
 
 • Python Magic 🐍
@@ -267,7 +271,7 @@ Please enter a valid format:
         vehicle_data = get_vehicle_info(vehicle_number)
         
         if vehicle_data is None:
-            await processing_msg.edit_text("""
+            error_text = """
 🌑 *Shadow Connection Failed*
 
 ╔═══════════════════════╗
@@ -276,7 +280,8 @@ Please enter a valid format:
 
 The shadows are silent... 
 Please try again later.
-            """, parse_mode='Markdown')
+            """
+            await processing_msg.edit_text(error_text, parse_mode='Markdown')
             return
         
         valid_data = {k: v for k, v in vehicle_data.items() if v is not None}
@@ -355,8 +360,7 @@ Please try again later.
         # Create action buttons
         keyboard = [
             [InlineKeyboardButton("🔍 Search Again", switch_inline_query_current_chat="")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu"),
-             InlineKeyboardButton("📊 Full Report", callback_data=f"full_{vehicle_number}")]
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
         ]
         
         await processing_msg.edit_text(
@@ -416,7 +420,7 @@ Try these formats:
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log errors and send a modern error message."""
     logger.error(f"Exception while handling an update: {context.error}")
     
@@ -433,7 +437,7 @@ Please contact @sarthx_bot
 *« Even shadows need maintenance »*
     """
     
-    if update and update.effective_message:
+    if isinstance(update, Update) and update.effective_message:
         await update.effective_message.reply_text(error_msg, parse_mode='Markdown')
 
 def main() -> None:
@@ -465,7 +469,9 @@ def main() -> None:
 * Status: Running...
 * Mode: Stealth Mode Enabled
     """)
-    application.run_polling()
+    
+    # Start polling
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
