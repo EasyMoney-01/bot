@@ -367,7 +367,8 @@ Please try again later.
         
     except Exception as e:
         logger.error(f"Error in handle_vehicle_number: {e}")
-        await processing_msg.edit_text(""⚡ *Shadow System Overload*
+        error_text = """
+⚡ *Shadow System Overload*
 
 ╔═══════════════════════╗
     SYSTEM MALFUNCTION
@@ -377,7 +378,8 @@ The dark forces are unstable...
 Please try again in a moment.
 
 *Error Code:* SHADOW-001
-        """, parse_mode='Markdown')
+        """
+        await processing_msg.edit_text(error_text, parse_mode='Markdown')
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks"""
