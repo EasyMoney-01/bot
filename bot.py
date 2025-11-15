@@ -3,9 +3,9 @@ from bs4 import BeautifulSoup
 from user_agent import generate_user_agent
 import os
 from dotenv import load_dotenv
-import telebot
-import time
 import logging
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Logger setup
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-bot = telebot.TeleBot(BOT_TOKEN)
 
 def get_vehicle_info(num):
     try:
@@ -45,10 +44,9 @@ def get_vehicle_info(num):
         logger.error(f"Scraping error: {e}")
         return None
 
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        bot.reply_to(message, 
+        await update.message.reply_text(
             "🤖 *VEHICLE INFO BOT*\n\n"
             "🛠️ *MADE BY DARK SHADOW* 🛠️\n\n"
             "🚗 *How to Use:*\n"
@@ -60,50 +58,26 @@ def send_welcome(message):
             "_MADE BY DARK SHADOW_",
             parse_mode='Markdown'
         )
-        logger.info(f"Start command from user: {message.chat.id}")
     except Exception as e:
         logger.error(f"Error in start: {e}")
 
-@bot.message_handler(commands=['owner'])
-def show_owner(message):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        bot.reply_to(message,
-            "👤 *BOT OWNER INFORMATION*\n\n"
-            "✨ *Creator:* DARK SHADOW\n"
-            "🛠️ *Made By:* DARK SHADOW\n"
-            "🚀 *Developer:* DARK SHADOW\n\n"
-            "_This bot is MADE BY DARK SHADOW_",
-            parse_mode='Markdown'
-        )
-    except Exception as e:
-        logger.error(f"Error in owner: {e}")
-
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    try:
-        vehicle_number = message.text.upper().strip()
+        vehicle_number = update.message.text.upper().strip()
         
         if len(vehicle_number) < 5:
-            bot.reply_to(message, "❌ Please enter a valid vehicle number\n\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
+            await update.message.reply_text("❌ Please enter a valid vehicle number\n\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
             return
         
-        logger.info(f"Searching for vehicle: {vehicle_number}")
-        processing_msg = bot.reply_to(message, "🔍 *Searching vehicle information...*\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
+        processing_msg = await update.message.reply_text("🔍 *Searching vehicle information...*\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
         
         vehicle_data = get_vehicle_info(vehicle_number)
         
         if not vehicle_data:
-            bot.edit_message_text(
-                "❌ *No data found for this vehicle*\n\n"
-                "_MADE BY DARK SHADOW_", 
-                chat_id=message.chat.id, 
-                message_id=processing_msg.message_id,
-                parse_mode='Markdown'
-            )
+            await processing_msg.edit_text("❌ *No data found for this vehicle*\n\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
             return
         
-        response = f"🚗 *Vehicle Information*\n\n"
-        response += f"🔢 *Vehicle Number:* `{vehicle_number}`\n\n"
+        response = f"🚗 *Vehicle Information*\n\n🔢 *Vehicle Number:* `{vehicle_number}`\n\n"
         
         found_data = False
         for key, value in vehicle_data.items():
@@ -114,36 +88,25 @@ def handle_message(message):
         if not found_data:
             response = "❌ *No information found for this vehicle*"
         
-        response += "\n\n"
-        response += "🛠️ _MADE BY DARK SHADOW_"
+        response += "\n\n🛠️ _MADE BY DARK SHADOW_"
         
-        bot.edit_message_text(
-            response, 
-            chat_id=message.chat.id, 
-            message_id=processing_msg.message_id,
-            parse_mode='Markdown'
-        )
-        logger.info(f"Data sent for vehicle: {vehicle_number}")
+        await processing_msg.edit_text(response, parse_mode='Markdown')
         
     except Exception as e:
         logger.error(f"Error handling message: {e}")
-        try:
-            bot.reply_to(message, "❌ *Error processing request*\n\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
-        except:
-            pass
+        await update.message.reply_text("❌ *Error processing request*\n\n_MADE BY DARK SHADOW_", parse_mode='Markdown')
 
-def start_bot():
+def main():
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     logger.info("🤖 Starting Vehicle Info Bot")
     logger.info("🛠️ MADE BY DARK SHADOW")
+    logger.info("🚀 Bot is running...")
     
-    while True:
-        try:
-            logger.info("🚀 Bot polling started...")
-            bot.polling(none_stop=True, timeout=30, long_polling_timeout=30)
-        except Exception as e:
-            logger.error(f"❌ Bot crashed: {e}")
-            logger.info("🔄 Restarting bot in 5 seconds...")
-            time.sleep(5)
+    application.run_polling()
 
 if __name__ == '__main__':
-    start_bot()
+    main()
